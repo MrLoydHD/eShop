@@ -4,6 +4,9 @@ var builder = DistributedApplication.CreateBuilder(args);
 
 builder.AddForwardedHeaders();
 
+// Add observability infrastructure
+var (prometheus, jaeger, grafana) = builder.AddObservabilityInfrastructure();
+
 var redis = builder.AddRedis("redis");
 var rabbitMq = builder.AddRabbitMQ("eventbus")
     .WithLifetime(ContainerLifetime.Persistent);
@@ -19,53 +22,98 @@ var webhooksDb = postgres.AddDatabase("webhooksdb");
 
 var launchProfileName = ShouldUseHttpForEndpoints() ? "http" : "https";
 
+// Define Jaeger connection for all services
+var jaegerHostName = "localhost";
+var jaegerOtlpEndpoint = $"http://{jaegerHostName}:4319";
+
 // Services
 var identityApi = builder.AddProject<Projects.Identity_API>("identity-api", launchProfileName)
     .WithExternalHttpEndpoints()
-    .WithReference(identityDb);
+    .WithReference(identityDb)
+    .WithEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT", jaegerOtlpEndpoint)
+    .WithEnvironment("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")
+    .WithEnvironment("OTEL_TRACES_SAMPLER", "always_on")
+    .WithHttpEndpoint(port: 9701, name: "metrics") // Unique port for metrics
+    .WithObservability("identity-api", jaeger);
 
 var identityEndpoint = identityApi.GetEndpoint(launchProfileName);
 
 var basketApi = builder.AddProject<Projects.Basket_API>("basket-api")
     .WithReference(redis)
     .WithReference(rabbitMq).WaitFor(rabbitMq)
-    .WithEnvironment("Identity__Url", identityEndpoint);
+    .WithEnvironment("Identity__Url", identityEndpoint)
+    .WithEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT", jaegerOtlpEndpoint)
+    .WithEnvironment("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")
+    .WithEnvironment("OTEL_TRACES_SAMPLER", "always_on")
+    .WithHttpEndpoint(port: 9702, name: "metrics")
+    .WithObservability("basket-api", jaeger);
 redis.WithParentRelationship(basketApi);
 
 var catalogApi = builder.AddProject<Projects.Catalog_API>("catalog-api")
     .WithReference(rabbitMq).WaitFor(rabbitMq)
-    .WithReference(catalogDb);
+    .WithReference(catalogDb)
+    .WithEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT", jaegerOtlpEndpoint)
+    .WithEnvironment("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")
+    .WithEnvironment("OTEL_TRACES_SAMPLER", "always_on")
+    .WithHttpEndpoint(port: 9703, name: "metrics")
+    .WithObservability("catalog-api", jaeger);
 
 var orderingApi = builder.AddProject<Projects.Ordering_API>("ordering-api")
     .WithReference(rabbitMq).WaitFor(rabbitMq)
     .WithReference(orderDb).WaitFor(orderDb)
     .WithHttpHealthCheck("/health")
-    .WithEnvironment("Identity__Url", identityEndpoint);
+    .WithEnvironment("Identity__Url", identityEndpoint)
+    .WithEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT", jaegerOtlpEndpoint)
+    .WithEnvironment("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")
+    .WithEnvironment("OTEL_TRACES_SAMPLER", "always_on")
+    .WithHttpEndpoint(port: 9704, name: "metrics")
+    .WithObservability("ordering-api", jaeger);
 
 builder.AddProject<Projects.OrderProcessor>("order-processor")
     .WithReference(rabbitMq).WaitFor(rabbitMq)
     .WithReference(orderDb)
-    .WaitFor(orderingApi); // wait for the orderingApi to be ready because that contains the EF migrations
+    .WaitFor(orderingApi) // wait for the orderingApi to be ready because that contains the EF migrations
+    .WithEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT", jaegerOtlpEndpoint)
+    .WithEnvironment("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")
+    .WithEnvironment("OTEL_TRACES_SAMPLER", "always_on")
+    .WithObservability("order-processor", jaeger);
 
 builder.AddProject<Projects.PaymentProcessor>("payment-processor")
-    .WithReference(rabbitMq).WaitFor(rabbitMq);
+    .WithReference(rabbitMq).WaitFor(rabbitMq)
+    .WithEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT", jaegerOtlpEndpoint)
+    .WithEnvironment("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")
+    .WithEnvironment("OTEL_TRACES_SAMPLER", "always_on")
+    .WithHttpEndpoint(port: 9705, name: "metrics")
+    .WithObservability("payment-processor", jaeger);
 
 var webHooksApi = builder.AddProject<Projects.Webhooks_API>("webhooks-api")
     .WithReference(rabbitMq).WaitFor(rabbitMq)
     .WithReference(webhooksDb)
-    .WithEnvironment("Identity__Url", identityEndpoint);
+    .WithEnvironment("Identity__Url", identityEndpoint)
+    .WithEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT", jaegerOtlpEndpoint)
+    .WithEnvironment("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")
+    .WithEnvironment("OTEL_TRACES_SAMPLER", "always_on")
+    .WithObservability("webhooks-api", jaeger);
 
 // Reverse proxies
 builder.AddProject<Projects.Mobile_Bff_Shopping>("mobile-bff")
     .WithReference(catalogApi)
     .WithReference(orderingApi)
     .WithReference(basketApi)
-    .WithReference(identityApi);
+    .WithReference(identityApi)
+    .WithEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT", jaegerOtlpEndpoint)
+    .WithEnvironment("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")
+    .WithEnvironment("OTEL_TRACES_SAMPLER", "always_on")
+    .WithObservability("mobile-bff", jaeger);
 
 // Apps
 var webhooksClient = builder.AddProject<Projects.WebhookClient>("webhooksclient", launchProfileName)
     .WithReference(webHooksApi)
-    .WithEnvironment("IdentityUrl", identityEndpoint);
+    .WithEnvironment("IdentityUrl", identityEndpoint)
+    .WithEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT", jaegerOtlpEndpoint)
+    .WithEnvironment("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")
+    .WithEnvironment("OTEL_TRACES_SAMPLER", "always_on")
+    .WithObservability("webhooks-client", jaeger);
 
 var webApp = builder.AddProject<Projects.WebApp>("webapp", launchProfileName)
     .WithExternalHttpEndpoints()
@@ -73,7 +121,11 @@ var webApp = builder.AddProject<Projects.WebApp>("webapp", launchProfileName)
     .WithReference(catalogApi)
     .WithReference(orderingApi)
     .WithReference(rabbitMq).WaitFor(rabbitMq)
-    .WithEnvironment("IdentityUrl", identityEndpoint);
+    .WithEnvironment("IdentityUrl", identityEndpoint)
+    .WithEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT", jaegerOtlpEndpoint)
+    .WithEnvironment("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")
+    .WithEnvironment("OTEL_TRACES_SAMPLER", "always_on")
+    .WithObservability("webapp", jaeger);
 
 // set to true if you want to use OpenAI
 bool useOpenAI = false;
