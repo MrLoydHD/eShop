@@ -92,7 +92,7 @@
         },
         "textMode": "auto"
       },
-      "pluginVersion": "10.2.0-61719",
+      "pluginVersion": "11.5.2",
       "targets": [
         {
           "datasource": {
@@ -100,7 +100,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(orders_created_total)",
+          "expr": "sum(orders_created_Number_of_orders_created_total)",
           "instant": false,
           "legendFormat": "Total Orders",
           "range": true,
@@ -154,7 +154,7 @@
         },
         "textMode": "auto"
       },
-      "pluginVersion": "10.2.0-61719",
+      "pluginVersion": "11.5.2",
       "targets": [
         {
           "datasource": {
@@ -162,7 +162,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(orders_completed_total)",
+          "expr": "sum(orders_completed_Number_of_orders_completed_successfully_total)",
           "instant": false,
           "legendFormat": "Completed Orders",
           "range": true,
@@ -216,7 +216,7 @@
         },
         "textMode": "auto"
       },
-      "pluginVersion": "10.2.0-61719",
+      "pluginVersion": "11.5.2",
       "targets": [
         {
           "datasource": {
@@ -286,7 +286,7 @@
         "showThresholdMarkers": true,
         "text": {}
       },
-      "pluginVersion": "10.2.0-61719",
+      "pluginVersion": "11.5.2",
       "targets": [
         {
           "datasource": {
@@ -294,7 +294,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(orders_failed_total)/sum(orders_created_total)",
+          "expr": "sum(orders_failed_total)/sum(orders_created_Number_of_orders_created_total)",
           "instant": false,
           "legendFormat": "Failure Rate",
           "range": true,
@@ -383,7 +383,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "10.2.0-61719",
+      "pluginVersion": "11.5.2",
       "targets": [
         {
           "datasource": {
@@ -391,7 +391,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "increase(orders_created_total[5m])",
+          "expr": "increase(orders_created_Number_of_orders_created_total[5m])",
           "instant": false,
           "legendFormat": "Created",
           "range": true,
@@ -403,7 +403,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "increase(orders_completed_total[5m])",
+          "expr": "increase(orders_completed_Number_of_orders_completed_successfully_total[5m])",
           "hide": false,
           "instant": false,
           "legendFormat": "Completed",
@@ -510,7 +510,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "10.2.0-61719",
+      "pluginVersion": "11.5.2",
       "targets": [
         {
           "datasource": {
@@ -650,7 +650,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "10.2.0-61719",
+      "pluginVersion": "11.5.2",
       "targets": [
         {
           "datasource": {
@@ -777,7 +777,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "10.2.0-61719",
+      "pluginVersion": "11.5.2",
       "targets": [
         {
           "datasource": {
@@ -785,7 +785,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket{path=\"/api/orders\"}[1m])) by (service_name, le))",
+          "expr": "histogram_quantile(0.95, sum by(service_name, le) (rate(http_server_request_duration_seconds_bucket{http_route=\"/api/orders/\"}[1m])))",
           "instant": false,
           "legendFormat": "{{service_name}} (p95)",
           "range": true,
@@ -877,7 +877,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "10.2.0-61719",
+      "pluginVersion": "11.5.2",
       "targets": [
         {
           "datasource": {
@@ -885,7 +885,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(rate(http_server_request_duration_seconds_count{path=~\"/api/orders.*\"}[1m])) by (path)",
+          "expr": "sum by(path) (rate(http_server_request_duration_seconds_count{http_route=~\"/api/orders.*\"}[1m]))",
           "instant": false,
           "legendFormat": "{{path}}",
           "range": true,
@@ -977,7 +977,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "10.2.0-61719",
+      "pluginVersion": "11.5.2",
       "targets": [
         {
           "datasource": {
@@ -985,7 +985,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(rate(http_server_request_duration_seconds_count{path=~\"/api/orders.*\", status_code=~\"(4|5)..\"}[1m])) by (path) / sum(rate(http_server_request_duration_seconds_count{path=~\"/api/orders.*\"}[1m])) by (path) * 100",
+          "expr": "(sum by(http_route) (rate(http_server_request_duration_seconds_count{http_route=~\"/api/orders.*\", http_response_status_code=\"500\"}[1m])) * 100) / sum by(http_route) (rate(http_server_request_duration_seconds_count{http_route=~\"/api/orders.*\"}[1m]))",
           "instant": false,
           "legendFormat": "{{path}}",
           "range": true,
@@ -1078,7 +1078,7 @@
         },
         "showHeader": true
       },
-      "pluginVersion": "10.2.0-61719",
+      "pluginVersion": "11.5.2",
       "targets": [
         {
           "datasource": {

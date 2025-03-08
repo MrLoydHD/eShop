@@ -2,6 +2,12 @@ using eShop.Ordering.API.OpenTelemetry;
 using System.Diagnostics;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using System.Text.Json;
+using System.Net.Mime;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.HttpLogging;
+using eShop.Ordering.API.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,6 +17,32 @@ builder.AddServiceDefaults();
 builder.AddOrderingTelemetry();
 builder.AddApplicationServices();
 builder.Services.AddProblemDetails();
+
+// Add HTTP Request Logging with filtering for sensitive data
+builder.Services.AddHttpLogging(logging =>
+{
+    logging.LoggingFields = HttpLoggingFields.RequestPropertiesAndHeaders | 
+                           HttpLoggingFields.ResponseStatusCode |
+                           HttpLoggingFields.Duration;
+                           
+    // Don't log sensitive headers
+    logging.RequestHeaders.Remove("Authorization");
+    logging.RequestHeaders.Remove("Cookie");
+    
+    // Add request ID header for correlation with traces
+    logging.RequestHeaders.Add("X-Request-ID");
+    logging.RequestHeaders.Add("X-B3-TraceId");
+    
+    // Don't log bodies as they may contain PII
+    logging.MediaTypeOptions.AddText("application/json");
+    logging.RequestBodyLogLimit = 4096;
+    logging.ResponseBodyLogLimit = 4096;
+});
+
+// Add health checks with tags for monitoring
+builder.Services.AddHealthChecks()
+    .AddCheck("ordering-api-liveness", () => HealthCheckResult.Healthy(), ["live"])
+    .AddCheck("ordering-db", () => HealthCheckResult.Healthy(), ["ready"]);
 
 var withApiVersioning = builder.Services.AddApiVersioning();
 
@@ -37,6 +69,32 @@ foreach (var env in Environment.GetEnvironmentVariables().Cast<System.Collection
     }
 }
 Console.WriteLine("\n========================================\n");
+
+// Health checks endpoint with detailed responses
+app.MapHealthChecks("/hc", new HealthCheckOptions
+{
+    ResponseWriter = async (context, report) =>
+    {
+        var result = JsonSerializer.Serialize(
+            new
+            {
+                status = report.Status.ToString(),
+                checks = report.Entries.Select(entry => new
+                {
+                    name = entry.Key,
+                    status = entry.Value.Status.ToString(),
+                    exception = entry.Value.Exception != null ? entry.Value.Exception.Message : "none",
+                    duration = entry.Value.Duration.ToString()
+                })
+            });
+
+        context.Response.ContentType = MediaTypeNames.Application.Json;
+        await context.Response.WriteAsync(result);
+    }
+});
+
+// Enable HTTP request logging
+app.UseHttpLogging();
 
 app.MapDefaultEndpoints();
 
@@ -137,6 +195,34 @@ app.MapGet("/check-jaeger", async () => {
     result["check_in_jaeger"] = $"Search for TraceID: {traceId} in Jaeger UI";
     
     return Results.Ok(result);
+});
+
+// Endpoint to generate order metrics for dashboard testing
+app.MapGet("/generate-metrics", () => {
+    var random = new Random();
+    var telemetryService = app.Services.GetRequiredService<OrderingTelemetryService>();
+    
+    // Generate a few random orders
+    for (int i = 0; i < 5; i++)
+    {
+        var orderId = random.Next(1000, 9999);
+        var orderValue = random.Next(50, 500);
+        
+        telemetryService.RecordOrderCreated(orderId, orderValue);
+        
+        // 80% success rate
+        if (random.NextDouble() > 0.2)
+        {
+            var processingTime = random.Next(500, 3000);
+            telemetryService.RecordOrderCompleted(orderId, processingTime);
+        }
+        else
+        {
+            telemetryService.RecordOrderFailed(orderId, "Simulated failure for testing");
+        }
+    }
+    
+    return Results.Ok(new { message = "Generated metrics for 5 test orders" });
 });
 
 var orders = app.NewVersionedApi("Orders");

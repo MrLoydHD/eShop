@@ -1,153 +1,135 @@
-# OpenTelemetry & Security Implementation for eShop
+# OpenTelemetry & Security Implementation in eShop
 
-This project implements OpenTelemetry tracing, metrics, and logging for the eShop application, with a focus on the "Place an Order" flow. It also includes security measures to mask sensitive data in telemetry and logs.
+This document outlines the implementation of OpenTelemetry tracing and security enhancements for the "Place an Order" feature in the eShop application.
 
-## Features Implemented
+## 1. Architecture Overview
 
-1. **End-to-End Tracing** for the "Place an Order" flow across multiple services
-2. **Sensitive Data Masking** for PII and payment information
-3. **Metrics Collection** for performance and business KPIs
-4. **Grafana Dashboard** for visualizing traces and metrics
-5. **Load Testing** to simulate user activity and generate telemetry data
+### 1.1 Instrumented Flow: "Place an Order"
 
-## Architecture
+I've chosen to implement OpenTelemetry instrumentation for the "Place an Order" feature, which spans across multiple microservices:
 
-The implementation adds the following components to the eShop microservices architecture:
+```
+Web/Mobile App → Basket API → Ordering API → OrderProcessor → Payment Processor
+```
 
-- **Jaeger**: Distributed tracing system for collecting and visualizing trace data
-- **Prometheus**: Time series database for storing metrics
-- **Grafana**: Dashboard for visualizing metrics and traces
+### 1.2 Components Modified
 
-The data flow is as follows:
-1. eShop services generate telemetry data using OpenTelemetry instrumentation
-2. Sensitive data is masked or excluded before being recorded
-3. Trace data is sent to Jaeger via OTLP
-4. Metrics are exposed via Prometheus endpoints
-5. Grafana visualizes the collected data
+- **Ordering.API**: Enhanced with custom telemetry service and middleware
+- **CreateOrderCommandHandler**: Instrumented with tracing for the order creation flow
+- **OrderingTelemetry Extensions**: Added metrics, traces, and context propagation
+- **Load Testing**: Custom k6 script to generate traffic and telemetry data
 
-## Technical Details
+## 2. OpenTelemetry Implementation
 
-### OpenTelemetry Configuration
+### 2.1 Tracing Implementation
 
-We've configured OpenTelemetry in the `eShop.ServiceDefaults` project to ensure consistent behavior across all services. Key components include:
+- Added custom `ActivitySource` for the Ordering API
+- Instrumented the main order processing flow with spans and events
+- Added context propagation between services using HTTP headers
+- Masked sensitive data (PII) in traces using custom processors
 
-- Activity sources for custom tracing
-- Metrics meters for business and technical KPIs
-- Processors to mask sensitive data
-- Exporters for Jaeger and Prometheus
+### 2.2 Metrics Implementation
 
-### Data Masking Implementation
+The following metrics are now collected:
 
-We've implemented two types of data masking:
+| Metric Name | Type | Description |
+|-------------|------|-------------|
+| `orders_created_total` | Counter | Number of orders created |
+| `orders_completed_total` | Counter | Number of orders completed successfully |
+| `orders_failed_total` | Counter | Number of orders that failed |
+| `order_processing_time` | Histogram | Time taken to process an order (ms) |
+| `order_value` | Histogram | Value of the order in USD |
 
-1. **Pattern-based masking**: Uses regex patterns to detect and mask email addresses, credit card numbers, etc.
-2. **Field-based masking**: Identifies sensitive fields by name (e.g., "password", "creditCard") and masks them automatically
+### 2.3 Data Masking & Security
 
-Example of masked data:
-- Credit Card: `4111111111111111` → `4111********1111`
-- Email: `user@example.com` → `u***@example.com`
-- User ID (UUID): `123e4567-e89b-12d3-a456-426614174000` → `123e4567-****-****-****-426614174000`
+- Implemented sensitive data masking in logs and traces:
+  - Credit card numbers (last 4 digits preserved)
+  - Email addresses (domain part preserved)
+  - Payment security codes (fully masked)
+- Added JSON sanitization for request/response bodies
+- Configured HTTP logging to exclude sensitive headers
 
-### Instrumented API Endpoints
+## 3. Dashboard Implementation
 
-The following API endpoints in the "Place an Order" flow have been instrumented:
+The dashboard has been integrated with the metrics to visualize:
 
-- `POST /api/orders` - Create a new order
-- `POST /api/orders/draft` - Create an order draft
-- `GET /api/orders` - Get orders for a user
-- `GET /api/orders/{orderId}` - Get a specific order
-- `PUT /api/orders/cancel` - Cancel an order
-- `PUT /api/orders/ship` - Mark an order as shipped
+- Total orders created, completed, and failed
+- Order processing time distribution
+- Order value distribution
+- Error rates by endpoint
+- Recent order traces with links to Jaeger UI
 
-### Metrics
+## 4. Load Testing
 
-We collect the following business and technical metrics:
+A custom k6 load test script (`order-flow-load-test.js`) has been created that:
 
-- **Business Metrics**:
-  - Order count (created, completed, failed)
-  - Order value distribution
-  - Order processing time
+1. Simulates users logging in
+2. Browses the catalog
+3. Adds items to cart
+4. Completes checkout
+5. Verifies order creation
 
-- **Technical Metrics**:
-  - HTTP request duration
-  - HTTP request rate
-  - HTTP error rate
-  - Database operation duration
+The script includes proper headers for distributed tracing and generates a realistic load pattern.
 
-## Setup and Configuration
+## 5. How to Run
 
-### Prerequisites
+### 5.1 Start Observability Stack
 
-- Docker Desktop
-- .NET 9 SDK
-- K6 (for load testing)
+```bash
+cd observability
+docker-compose up -d
+```
 
-### Running the Application with Telemetry
+This will start:
+- Jaeger (tracing)
+- Prometheus (metrics)
+- Grafana (visualization)
+- OpenTelemetry Collector (data collection)
 
-1. Ensure Docker is running
-2. Run the application using:
-   ```bash
-   dotnet run --project src/eShop.AppHost/eShop.AppHost.csproj
-   ```
-3. Access the dashboards:
-   - Aspire Dashboard: http://localhost:19888
-   - Grafana: http://localhost:3000 (user: admin, password: admin)
-   - Jaeger UI: http://localhost:16686
-   - Prometheus: http://localhost:9090
+### 5.2 Build and Run the eShop Application
 
-### Running the Load Test
+```bash
+dotnet build
+dotnet run --project src/eShop.AppHost
+```
 
-To generate traffic and telemetry data:
+### 5.3 Run the Load Test
 
-1. Install K6:
-   ```bash
-   # macOS
-   brew install k6
-   
-   # Windows
-   choco install k6
-   
-   # Linux
-   apt-get install k6
-   ```
+```bash
+cd loadtest
+k6 run order-flow-load-test.js
+```
 
-2. Run the load test:
-   ```bash
-   k6 run src/tests/LoadTests/PlaceOrderTest.js
-   ```
+### 5.4 View the Results
 
-## Exploring the Telemetry Data
+- **Grafana Dashboard**: http://localhost:3000/d/eshop-orders
+- **Jaeger UI**: http://localhost:16686
+- **Prometheus**: http://localhost:9090
 
-### Viewing Traces in Jaeger
+## 6. Implementation Details
 
-1. Open Jaeger UI at http://localhost:16686
-2. Select "ordering-api" from the Service dropdown
-3. Click "Find Traces" to see all traces
-4. Look for traces with "PlaceOrder" operation to see the order flow
+### 6.1 Code Structure Changes
 
-### Using the Grafana Dashboard
+- Added `OpenTelemetry` folder to Ordering.API
+- Enhanced `CreateOrderCommandHandler` with tracing
+- Added middleware for trace context propagation
+- Created telemetry service for application code to use
 
-1. Open Grafana at http://localhost:3000 (user: admin, password: admin)
-2. Navigate to the "eShop Order Processing Dashboard"
-3. The dashboard shows:
-   - Order volume metrics
-   - Order processing time
-   - Order value distribution
-   - Recent order traces
+### 6.2 Security Enhancements
 
-## Security Considerations
+- Column masking is implemented through the `MaskSensitiveData` and `SanitizeJsonPayload` methods
+- Payment information is masked in logs and traces
+- Personal identifiable information is protected in all telemetry data
 
-This implementation includes several security measures:
+## 7. Future Improvements
 
-1. **Data Masking**: Sensitive data is masked in logs and traces
-2. **Data Minimization**: Only necessary data is collected
-3. **Short Retention**: Configured reasonable retention periods for telemetry data
-4. **Secure Transmission**: All telemetry data is transmitted within the internal network
+- Add additional metrics for order items, categories, and user behavior
+- Implement more granular performance tracking for database operations
+- Add anomaly detection for order processing time and failures
+- Expand telemetry to cover additional services in the order flow
 
-## Future Improvements
+## 8. References
 
-- Add column-level masking in the database layer
-- Implement role-based access control for telemetry data
-- Add anomaly detection for security events
-- Extend tracing to cover more user flows
-- Implement distributed tracing for the frontend applications
+- [OpenTelemetry Documentation](https://opentelemetry.io/docs/)
+- [Grafana Dashboard JSON](https://github.com/dotnet/eShop/blob/main/observability/grafana/dashboards/order-processing.json)
+- [Load Testing with k6](https://k6.io/docs/)

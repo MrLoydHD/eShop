@@ -24,8 +24,8 @@ const ORDERING_URL = 'http://localhost:5102'; // Ordering API
 
 // Test data
 const TEST_USER = {
-  email: 'demouser@microsoft.com',
-  password: 'Pass@word1'
+  username: 'alice',
+  password: 'Pass123$'
 };
 
 // Sample product IDs to add to cart (you might need to adjust these based on your catalog)
@@ -85,7 +85,7 @@ export default function() {
 function login() {
   const url = `${IDENTITY_URL}/connect/token`;
   const payload = {
-    username: TEST_USER.email,
+    username: TEST_USER.username,
     password: TEST_USER.password,
     grant_type: 'password',
     scope: 'openid profile basket ordering'
@@ -227,7 +227,7 @@ function checkout(token, basketId, userId, items, paymentInfo) {
   
   const orderData = {
     userId: userId,
-    userName: TEST_USER.email,
+    userName: TEST_USER.username,
     city: paymentInfo.city,
     street: paymentInfo.street,
     state: paymentInfo.state,

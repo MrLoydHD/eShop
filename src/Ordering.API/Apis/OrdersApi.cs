@@ -322,7 +322,6 @@ public static class OrdersApi
                 if (result)
                 {
                     services.Logger.LogInformation("CreateOrderCommand succeeded - RequestId: {RequestId}", requestId);
-                    telemetryService.RecordOrderCreated();
                     paymentActivity?.SetStatus(ActivityStatusCode.Ok);
                     orderActivity?.SetStatus(ActivityStatusCode.Ok);
                 }

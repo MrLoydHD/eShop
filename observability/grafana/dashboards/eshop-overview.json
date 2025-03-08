@@ -87,7 +87,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(orders_created_total)",
+          "expr": "sum(orders_created_Number_of_orders_created_total)",
           "instant": false,
           "legendFormat": "Total Orders",
           "range": true,
@@ -149,7 +149,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(orders_completed_total)",
+          "expr": "sum(orders_completed_Number_of_orders_completed_successfully_total)",
           "instant": false,
           "legendFormat": "Completed Orders",
           "range": true,
@@ -311,7 +311,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(rate(http_server_request_duration_seconds_count[1m])) by (service_name)",
+          "expr": "sum(rate(http_server_request_duration_seconds_count[1m])) by (exported_job)",
           "instant": false,
           "legendFormat": "{{service_name}}",
           "range": true,
@@ -412,7 +412,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(rate(http_server_request_duration_seconds_count{status_code=~\"5..\"}[1m])) by (service_name) / sum(rate(http_server_request_duration_seconds_count[1m])) by (service_name) * 100",
+          "expr": "(sum by(exported_job) (rate(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\"}[1m])) * 100) / sum by(exported_job) (rate(http_server_request_duration_seconds_count[1m]))",
           "instant": false,
           "legendFormat": "{{service_name}}",
           "range": true,
@@ -513,7 +513,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket[1m])) by (service_name, le))",
+          "expr": "histogram_quantile(0.95, sum by(exported_job, le) (rate(http_server_request_duration_seconds_bucket[1m])))",
           "instant": false,
           "legendFormat": "{{service_name}} (p95)",
           "range": true,
