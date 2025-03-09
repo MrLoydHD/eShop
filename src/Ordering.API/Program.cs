@@ -207,8 +207,8 @@ app.MapGet("/generate-metrics", () => {
     {
         var orderId = random.Next(1000, 9999);
         var orderValue = random.Next(50, 500);
-        
-        telemetryService.RecordOrderCreated(orderId, orderValue);
+
+        telemetryService.RecordOrderCreated(orderId);
         
         // 80% success rate
         if (random.NextDouble() > 0.2)

@@ -515,7 +515,7 @@
           "editorMode": "code",
           "expr": "histogram_quantile(0.95, sum by(exported_job, le) (rate(http_server_request_duration_seconds_bucket[1m])))",
           "instant": false,
-          "legendFormat": "{{service_name}} (p95)",
+          "legendFormat": "{{exported_job}} (p95)",
           "range": true,
           "refId": "A"
         }

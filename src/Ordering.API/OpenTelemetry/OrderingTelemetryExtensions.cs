@@ -19,34 +19,42 @@ namespace eShop.Ordering.API.OpenTelemetry
     {
         // Define constants for instrumentation
         public const string ServiceName = "eShop.Ordering";
+        public const string PlaceOrderServiceName = "eShop.Ordering.PlaceOrder";
         public const string ServiceVersion = "1.0.0";
         
         // Create ActivitySource and Meter for tracking ordering
         private static readonly ActivitySource ActivitySource = new(ServiceName, ServiceVersion);
+        private static readonly ActivitySource PlaceOrderActivitySource = new(PlaceOrderServiceName, ServiceVersion);
         private static readonly Meter Meter = new(ServiceName, ServiceVersion);
         
-        // Create metrics
+        // Create metrics with consistent naming pattern - use "orders" prefix for all related metrics
         private static readonly Counter<long> OrdersCreatedCounter = Meter.CreateCounter<long>(
-            "orders_created_total", 
-            "Number of orders created");
+            "orders.created", 
+            "Number of orders attempted to be created");
             
         private static readonly Counter<long> OrdersCompletedCounter = Meter.CreateCounter<long>(
-            "orders_completed_total", 
+            "orders.completed", 
             "Number of orders completed successfully");
             
         private static readonly Counter<long> OrdersFailedCounter = Meter.CreateCounter<long>(
-            "orders_failed_total", 
+            "orders.failed", 
             "Number of orders that failed");
             
         private static readonly Histogram<double> OrderProcessingTime = Meter.CreateHistogram<double>(
-            "order_processing_time", 
+            "orders.processing_time", 
             "ms", 
             "Time taken to process an order from submission to completion");
         
+        // Define appropriate buckets for order values
         private static readonly Histogram<double> OrderValue = Meter.CreateHistogram<double>(
-            "order_value", 
+            "orders.value", 
             "USD", 
             "Value of the order in USD");
+            
+        // Expose the counters as properties so we can read their values
+        public static Counter<long> CreatedCounter => OrdersCreatedCounter;
+        public static Counter<long> CompletedCounter => OrdersCompletedCounter;
+        public static Counter<long> FailedCounter => OrdersFailedCounter;
         
         public static WebApplicationBuilder AddOrderingTelemetry(this WebApplicationBuilder builder)
         {
@@ -92,8 +100,6 @@ namespace eShop.Ordering.API.OpenTelemetry
                         // Don't include potentially sensitive SQL in traces
                         options.SetDbStatementForText = false;
                     });
-                    
-                    // Note: Exporters are configured in AppHost
                 })
                 .WithMetrics(metrics => 
                 {
@@ -104,8 +110,6 @@ namespace eShop.Ordering.API.OpenTelemetry
                     metrics.AddRuntimeInstrumentation();
                     metrics.AddAspNetCoreInstrumentation();
                     metrics.AddHttpClientInstrumentation();
-                    
-                    // Note: Exporters are configured in AppHost
                 });
                 
             // Register our telemetry service as a singleton
@@ -115,24 +119,17 @@ namespace eShop.Ordering.API.OpenTelemetry
         }
         
         // Public methods for recording metrics
-        public static void RecordOrderCreated(int orderId, double value = 0)
+        public static void RecordOrderCreated(int orderId)
         {
-            // Increment the counter
+            // Increment the counter (but don't record order value yet)
             OrdersCreatedCounter.Add(1);
-            
-            // Record order value if provided
-            if (value > 0)
-            {
-                OrderValue.Record(value);
-            }
             
             // Create a span for the order creation
             using var activity = ActivitySource.StartActivity("OrderCreated", ActivityKind.Producer);
             activity?.SetTag("order.id", orderId);
-            activity?.SetTag("order.value", value);
         }
         
-        public static void RecordOrderCompleted(int orderId, double processingTimeMs)
+        public static void RecordOrderCompleted(int orderId, double processingTimeMs, double orderValue = 0)
         {
             // Increment the counter
             OrdersCompletedCounter.Add(1);
@@ -140,10 +137,20 @@ namespace eShop.Ordering.API.OpenTelemetry
             // Record the processing time
             OrderProcessingTime.Record(processingTimeMs);
             
+            // Record order value ONLY on successful completion
+            if (orderValue > 0)
+            {
+                OrderValue.Record(orderValue);
+            }
+            
             // Create a span for the order completion
             using var activity = ActivitySource.StartActivity("OrderCompleted");
             activity?.SetTag("order.id", orderId);
             activity?.SetTag("order.processing_time_ms", processingTimeMs);
+            if (orderValue > 0)
+            {
+                activity?.SetTag("order.value", orderValue);
+            }
         }
         
         public static void RecordOrderFailed(int orderId, string reason)
@@ -174,6 +181,13 @@ namespace eShop.Ordering.API.OpenTelemetry
             activity?.SetTag("order.id", orderId);
             return activity;
         }
+        
+        public static Activity StartPlaceOrderActivity(int orderId)
+        {
+            var activity = PlaceOrderActivitySource.StartActivity("PlaceOrder", ActivityKind.Server);
+            activity?.SetTag("order.id", orderId);
+            return activity;
+        }
     }
     
     // Service for application code to access telemetry features
@@ -194,16 +208,17 @@ namespace eShop.Ordering.API.OpenTelemetry
         }
         
         // Public methods for application code to use
-        public void RecordOrderCreated(int orderId, double value = 0)
+        public void RecordOrderCreated(int orderId)
         {
-            OrderingTelemetryExtensions.RecordOrderCreated(orderId, value);
-            _logger.LogInformation("Order {OrderId} created with value {Value}", orderId, value);
+            OrderingTelemetryExtensions.RecordOrderCreated(orderId);
+            _logger.LogInformation("Order {OrderId} created", orderId);
         }
         
-        public void RecordOrderCompleted(int orderId, double processingTimeMs)
+        public void RecordOrderCompleted(int orderId, double processingTimeMs, double orderValue = 0)
         {
-            OrderingTelemetryExtensions.RecordOrderCompleted(orderId, processingTimeMs);
-            _logger.LogInformation("Order {OrderId} completed in {ProcessingTimeMs}ms", orderId, processingTimeMs);
+            OrderingTelemetryExtensions.RecordOrderCompleted(orderId, processingTimeMs, orderValue);
+            _logger.LogInformation("Order {OrderId} completed in {ProcessingTimeMs}ms with value {OrderValue}", 
+                orderId, processingTimeMs, orderValue);
         }
         
         public void RecordOrderFailed(int orderId, string reason)
@@ -223,6 +238,13 @@ namespace eShop.Ordering.API.OpenTelemetry
         {
             var activity = OrderingTelemetryExtensions.StartOrderProcessing(orderId);
             _logger.LogInformation("Started processing order {OrderId}", orderId);
+            return activity;
+        }
+        
+        public Activity StartPlaceOrderActivity(int orderId)
+        {
+            var activity = OrderingTelemetryExtensions.StartPlaceOrderActivity(orderId);
+            _logger.LogInformation("Started place order activity for order {OrderId}", orderId);
             return activity;
         }
         
@@ -339,6 +361,36 @@ namespace eShop.Ordering.API.OpenTelemetry
             
             return sensitiveProperties.Any(p => 
                 propertyName.Equals(p, StringComparison.OrdinalIgnoreCase));
+        }
+        
+        // Add methods to get current counter values for dashboard calculations
+        public long GetTotalOrdersCreated()
+        {
+            // This is a simplified approach - in a real system you might need to get this from a metrics collector
+            // For demonstration purposes only
+            return 0; // Placeholder - would need actual implementation to read counter value
+        }
+        
+        public long GetOrdersCompleted()
+        {
+            return 0; // Placeholder - would need actual implementation to read counter value
+        }
+        
+        public long GetOrdersFailed()
+        {
+            return 0; // Placeholder - would need actual implementation to read counter value
+        }
+        
+        // Calculate failure rate as a percentage
+        public double GetOrderFailureRate()
+        {
+            long created = GetTotalOrdersCreated();
+            long failed = GetOrdersFailed();
+            
+            if (created == 0)
+                return 0;
+                
+            return (double)failed / created * 100;
         }
     }
 }

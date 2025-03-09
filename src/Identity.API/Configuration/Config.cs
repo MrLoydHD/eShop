@@ -41,6 +41,34 @@
         {
             return new List<Client>
             {
+                // Add a new client specifically for load testing
+                new Client
+                {
+                    ClientId = "loadtest",
+                    ClientName = "Load Testing Client",
+                    ClientSecrets = new List<Secret>
+                    {
+                        new Secret("secret".Sha256())
+                    },
+                    // Allow both password and client credentials flows for testing
+                    AllowedGrantTypes = GrantTypes.ResourceOwnerPasswordAndClientCredentials,
+                    AllowAccessTokensViaBrowser = true,
+                    RequireConsent = false,
+                    AllowOfflineAccess = true,
+                    AlwaysIncludeUserClaimsInIdToken = true,
+                    RequirePkce = false,
+                    AllowedScopes = new List<string>
+                    {
+                        IdentityServerConstants.StandardScopes.OpenId,
+                        IdentityServerConstants.StandardScopes.Profile,
+                        IdentityServerConstants.StandardScopes.OfflineAccess,
+                        "orders",
+                        "basket",
+                        "webhooks"
+                    },
+                    AccessTokenLifetime = 60*60*2, // 2 hours
+                    IdentityTokenLifetime= 60*60*2 // 2 hours
+                },
                 new Client
                 {
                     ClientId = "maui",

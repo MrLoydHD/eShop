@@ -84,15 +84,15 @@ public static class ObservabilityExtensions
         where T : IResourceWithEnvironment
     {
         // Get the fixed IP address for Jaeger instead of relying on DNS resolution
-        var jaegerEndpoint = "http://localhost:4319";
+        var otelEndpoint = "http://localhost:4319";
         
         return builder
             // Add direct connection to make debugging easier
-            .WithEnvironment("ConnectionStrings__Jaeger", jaegerEndpoint)
+            .WithEnvironment("ConnectionStrings__Jaeger", otelEndpoint)
             // Add standard OpenTelemetry configuration
             .WithEnvironment("OTEL_SERVICE_NAME", serviceName)
             .WithEnvironment("OTEL_RESOURCE_ATTRIBUTES", $"service.name={serviceName}")
-            .WithEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT", jaegerEndpoint)
+            .WithEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT", otelEndpoint)
             .WithEnvironment("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")
             .WithEnvironment("OTEL_METRICS_EXPORTER", "otlp,prometheus")
             .WithEnvironment("OTEL_LOGS_EXPORTER", "otlp")

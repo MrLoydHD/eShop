@@ -13,7 +13,6 @@ using System.Diagnostics.Metrics;
 
 namespace eShop.Ordering.API.Application.Commands
 {
-    // Regular command handler enriched with OpenTelemetry instrumentation
     public class CreateOrderCommandHandler : IRequestHandler<CreateOrderCommand, bool>
     {
         private readonly IOrderRepository _orderRepository;
@@ -21,7 +20,6 @@ namespace eShop.Ordering.API.Application.Commands
         private readonly ILogger<CreateOrderCommandHandler> _logger;
         private readonly OrderingTelemetryService _telemetryService;
         
-        // Constructor with all dependencies
         public CreateOrderCommandHandler(
             IOrderRepository orderRepository, 
             IOrderingIntegrationEventService orderingIntegrationEventService,
@@ -39,12 +37,12 @@ namespace eShop.Ordering.API.Application.Commands
             // Start timing the operation
             var startTime = Stopwatch.GetTimestamp();
             
-            // Start a new activity/span for order creation
+            // Start a new activity/span for order processing
             using var orderActivity = _telemetryService.StartOrderProcessing(-1); // Will update with real ID
             orderActivity?.SetTag("order.buyer", command.UserName);
             orderActivity?.SetTag("order.items_count", command.OrderItems.Count());
             
-            // Calculate order total for metrics
+            // Calculate order total for metrics (but don't record it yet)
             decimal orderTotal = command.OrderItems.Sum(i => i.UnitPrice * i.Units);
             
             try
@@ -54,14 +52,14 @@ namespace eShop.Ordering.API.Application.Commands
                 
                 // Create Order using the fully qualified name to resolve ambiguity
                 var order = new eShop.Ordering.Domain.AggregatesModel.OrderAggregate.Order(
-                    command.UserId,             // string userId
-                    command.UserName,           // string userName
-                    address,                    // Address address
-                    command.CardTypeId,         // int cardTypeId
-                    command.CardNumber,         // string cardNumber
-                    command.CardSecurityNumber, // string cardSecurityNumber
-                    command.CardHolderName,     // string cardHolderName
-                    command.CardExpiration      // DateTime cardExpiration
+                    command.UserId,
+                    command.UserName,
+                    address,
+                    command.CardTypeId,
+                    command.CardNumber,
+                    command.CardSecurityNumber,
+                    command.CardHolderName,
+                    command.CardExpiration
                 );
 
                 foreach (var item in command.OrderItems)
@@ -77,14 +75,10 @@ namespace eShop.Ordering.API.Application.Commands
                 // Save changes
                 await _orderRepository.UnitOfWork.SaveEntitiesAsync(cancellationToken);
                 
-                // Record the order creation with the real ID
-                _telemetryService.RecordOrderCreated(order.Id, (double)orderTotal);
-                
                 // Update the activity with the real order ID
                 orderActivity?.SetTag("order.id", order.Id);
                 
                 // Publish integration event to notify other services
-                // Use the simple constructor that only takes userId
                 var orderStartedIntegrationEvent = new OrderStartedIntegrationEvent(command.UserId);
                 
                 await _orderingIntegrationEventService.AddAndSaveEventAsync(orderStartedIntegrationEvent);
@@ -95,9 +89,12 @@ namespace eShop.Ordering.API.Application.Commands
                 _logger.LogInformation("----- Order {OrderId} created successfully for user {UserName}, payment method: {PaymentMethod} ({CardNumber})",
                     order.Id, command.UserName, "Credit Card", maskedCardNumber);
                 
-                // Calculate and record operation duration
+                // Calculate elapsed time
                 var elapsedMs = GetElapsedMilliseconds(startTime);
-                _telemetryService.RecordOrderCompleted(order.Id, elapsedMs);
+                
+                // Note: We don't call RecordOrderCompleted here as it's handled at the API layer
+                // Just update the activity with timing data
+                orderActivity?.SetTag("processing.time.ms", elapsedMs);
                 
                 return true;
             }
@@ -106,11 +103,11 @@ namespace eShop.Ordering.API.Application.Commands
                 // Record failure with exception details
                 _logger.LogError(ex, "Error creating order for user {UserName}", command.UserName);
                 
-                // Record the failure in telemetry
-                _telemetryService.RecordOrderFailed(-1, ex.Message);
-                
                 // Mark the activity as failed
                 orderActivity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+                orderActivity?.SetTag("error.type", ex.GetType().Name);
+                orderActivity?.SetTag("error.message", ex.Message);
+                orderActivity?.SetTag("error.stack_trace", ex.StackTrace);
                 
                 throw;
             }

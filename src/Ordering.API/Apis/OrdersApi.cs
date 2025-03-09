@@ -7,10 +7,10 @@ using System.Diagnostics.Metrics;
 
 public static class OrdersApi
 {
-    // Create a dedicated ActivitySource and Meter for this class
+    // We'll keep these for operations that don't need to update counters
     private static readonly ActivitySource ActivitySource = new("eShop.Ordering", "1.0.0");
-    private static readonly Meter Meter = new("eShop.Ordering", "1.0.0");
-
+    private static readonly ActivitySource PlaceOrderActivitySource = new("eShop.Ordering.PlaceOrder", "1.0.0");
+    
     // Helpers to mask sensitive data
     private static string MaskUserId(string userId)
     {
@@ -103,7 +103,6 @@ public static class OrdersApi
         catch (Exception ex)
         {
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
-            // Replace RecordException with setting exception details as tags
             activity?.SetTag("error.type", ex.GetType().Name);
             activity?.SetTag("error.message", ex.Message);
             activity?.SetTag("error.stack_trace", ex.StackTrace);
@@ -151,7 +150,6 @@ public static class OrdersApi
         catch (Exception ex)
         {
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
-            // Replace RecordException with setting exception details as tags
             activity?.SetTag("error.type", ex.GetType().Name);
             activity?.SetTag("error.message", ex.Message);
             activity?.SetTag("error.stack_trace", ex.StackTrace);
@@ -173,7 +171,6 @@ public static class OrdersApi
         catch (Exception ex)
         {
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
-            // Replace RecordException with setting exception details as tags
             activity?.SetTag("error.type", ex.GetType().Name);
             activity?.SetTag("error.message", ex.Message);
             activity?.SetTag("error.stack_trace", ex.StackTrace);
@@ -235,7 +232,6 @@ public static class OrdersApi
         catch (Exception ex)
         {
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
-            // Replace RecordException with setting exception details as tags
             activity?.SetTag("error.type", ex.GetType().Name);
             activity?.SetTag("error.message", ex.Message);
             activity?.SetTag("error.stack_trace", ex.StackTrace);
@@ -249,17 +245,15 @@ public static class OrdersApi
         [AsParameters] OrderServices services,
         OrderingTelemetryService telemetryService)
     {
-        // Start the main order creation activity
-        using var orderActivity = ActivitySource.StartActivity("PlaceOrder");
+        // Start the main order creation activity - but use the telemetry service for consistent tracking
+        using var orderActivity = telemetryService.StartPlaceOrderActivity(-1); // Will update when we have an order ID
         orderActivity?.SetTag("request.id", requestId.ToString());
         orderActivity?.SetTag("order.items.count", request.Items.Count);
         orderActivity?.SetTag("user.id.masked", MaskUserId(request.UserId));
             
-        // Record order value for metrics
-        // Use Quantity instead of Units
-        double orderTotal = request.Items.Sum(i => (double)(i.UnitPrice * i.Quantity)); // Explicit cast to double
-        Meter.CreateHistogram<double>("order.value").Record(orderTotal);
-            
+        // Calculate order total (but don't record it as a metric yet)
+        double orderTotal = request.Items.Sum(i => (double)(i.UnitPrice * i.Quantity));
+        
         // Log the beginning of order process - careful not to log sensitive data
         services.Logger.LogInformation(
             "Sending command: {CommandName} - {IdProperty}: {CommandId}",
@@ -274,6 +268,9 @@ public static class OrdersApi
             return TypedResults.BadRequest("RequestId is missing.");
         }
 
+        // Record that we're creating an order - but WITHOUT the order value
+        telemetryService.RecordOrderCreated(-1);
+
         using (services.Logger.BeginScope(new List<KeyValuePair<string, object>> { new("IdentifiedCommandId", requestId) }))
         {
             // Create payment processing sub-activity
@@ -284,7 +281,7 @@ public static class OrdersApi
             try
             {
                 // Mask credit card information both for logging and telemetry
-                var maskedCCNumber = request.CardNumber.Substring(request.CardNumber.Length - 4).PadLeft(request.CardNumber.Length, 'X');
+                var maskedCCNumber = telemetryService.MaskSensitiveData(request.CardNumber, true);
                 
                 if (paymentActivity != null)
                 {
@@ -313,10 +310,8 @@ public static class OrdersApi
                 
                 var result = await services.Mediator.Send(requestCreateOrder);
                 
-                // Calculate and record processing time
-                var endTime = Stopwatch.GetTimestamp();
-                var elapsedMilliseconds = Stopwatch.GetElapsedTime(startTime, endTime).TotalMilliseconds;
-                Meter.CreateHistogram<double>("order.processing.time").Record(elapsedMilliseconds);
+                // Calculate elapsed time
+                var elapsedMilliseconds = Stopwatch.GetElapsedTime(startTime, Stopwatch.GetTimestamp()).TotalMilliseconds;
                 orderActivity?.SetTag("processing.time.ms", elapsedMilliseconds);
 
                 if (result)
@@ -324,20 +319,25 @@ public static class OrdersApi
                     services.Logger.LogInformation("CreateOrderCommand succeeded - RequestId: {RequestId}", requestId);
                     paymentActivity?.SetStatus(ActivityStatusCode.Ok);
                     orderActivity?.SetStatus(ActivityStatusCode.Ok);
+                    
+                    // Record successful completion WITH the order value - only record value on success
+                    telemetryService.RecordOrderCompleted(-1, elapsedMilliseconds, orderTotal);
                 }
                 else
                 {
                     services.Logger.LogWarning("CreateOrderCommand failed - RequestId: {RequestId}", requestId);
-                    Meter.CreateCounter<long>("orders.failed").Add(1);
                     paymentActivity?.SetStatus(ActivityStatusCode.Error, "Payment processing failed");
                     orderActivity?.SetStatus(ActivityStatusCode.Error, "Order creation failed");
+                    
+                    // Record failure without recording order value
+                    telemetryService.RecordOrderFailed(-1, "CreateOrderCommand returned false");
                 }
 
                 return TypedResults.Ok();
             }
             catch (Exception ex)
             {
-                // Replace RecordException with setting exception details as tags
+                // Set failure status on activities
                 if (paymentActivity != null)
                 {
                     paymentActivity.SetStatus(ActivityStatusCode.Error, ex.Message);
@@ -354,7 +354,9 @@ public static class OrdersApi
                     orderActivity.SetTag("error.stack_trace", ex.StackTrace);
                 }
                 
-                Meter.CreateCounter<long>("orders.failed").Add(1);
+                // Record failure with the telemetry service (without recording order value)
+                telemetryService.RecordOrderFailed(-1, ex.Message);
+                
                 throw;
             }
         }

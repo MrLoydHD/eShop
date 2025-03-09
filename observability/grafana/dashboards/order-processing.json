@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 2,
+  "id": 4,
   "links": [
     {
       "asDropdown": false,
@@ -33,7 +33,6 @@
       "url": "/d/eshop-overview"
     }
   ],
-  "liveNow": false,
   "panels": [
     {
       "collapsed": false,
@@ -83,6 +82,7 @@
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -90,7 +90,9 @@
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
       "pluginVersion": "11.5.2",
       "targets": [
@@ -100,7 +102,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(orders_created_Number_of_orders_created_total)",
+          "expr": "sum(orders_created_Number_of_orders_attempted_to_be_created_total)",
           "instant": false,
           "legendFormat": "Total Orders",
           "range": true,
@@ -145,6 +147,7 @@
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -152,7 +155,9 @@
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
       "pluginVersion": "11.5.2",
       "targets": [
@@ -183,6 +188,7 @@
             "mode": "thresholds"
           },
           "mappings": [],
+          "noValue": "0",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -207,6 +213,7 @@
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -214,7 +221,9 @@
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
       "pluginVersion": "11.5.2",
       "targets": [
@@ -224,7 +233,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(orders_failed_total)",
+          "expr": "sum(orders_failed_Number_of_orders_that_failed_total)",
           "instant": false,
           "legendFormat": "Failed Orders",
           "range": true,
@@ -274,6 +283,8 @@
       },
       "id": 17,
       "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
         "orientation": "auto",
         "reduceOptions": {
           "calcs": [
@@ -284,6 +295,7 @@
         },
         "showThresholdLabels": false,
         "showThresholdMarkers": true,
+        "sizing": "auto",
         "text": {}
       },
       "pluginVersion": "11.5.2",
@@ -294,7 +306,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(orders_failed_total)/sum(orders_created_Number_of_orders_created_total)",
+          "expr": "sum(orders_failed_Number_of_orders_that_failed_total)/sum(orders_created_Number_of_orders_attempted_to_be_created_total)",
           "instant": false,
           "legendFormat": "Failure Rate",
           "range": true,
@@ -303,6 +315,72 @@
       ],
       "title": "Order Failure Rate",
       "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "currencyUSD"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 4,
+        "x": 20,
+        "y": 1
+      },
+      "id": 34,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.5.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(orders_value_USD_sum)",
+          "instant": false,
+          "legendFormat": "Total Value",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Total Order Value",
+      "type": "stat"
     },
     {
       "datasource": {
@@ -321,6 +399,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 40,
             "gradientMode": "opacity",
@@ -379,6 +458,7 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "none"
         }
@@ -391,7 +471,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "increase(orders_created_Number_of_orders_created_total[5m])",
+          "expr": "increase(orders_created_Number_of_orders_attempted_to_be_created_total[5m])",
           "instant": false,
           "legendFormat": "Created",
           "range": true,
@@ -416,7 +496,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "increase(orders_failed_total[5m])",
+          "expr": "increase(orders_failed_Number_of_orders_that_failed_total[5m])",
           "hide": false,
           "instant": false,
           "legendFormat": "Failed",
@@ -444,6 +524,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 30,
             "gradientMode": "opacity",
@@ -506,6 +587,7 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "none"
         }
@@ -518,7 +600,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.5, sum(rate(order_value_bucket[5m])) by (le))",
+          "expr": "histogram_quantile(0.5, sum(rate(orders_value_USD_bucket[5m])) by (le))",
           "instant": false,
           "legendFormat": "Median",
           "range": true,
@@ -530,7 +612,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum(rate(order_value_bucket[5m])) by (le))",
+          "expr": "histogram_quantile(0.95, sum(rate(orders_value_USD_bucket[5m])) by (le))",
           "hide": false,
           "instant": false,
           "legendFormat": "p95",
@@ -543,7 +625,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.99, sum(rate(order_value_bucket[5m])) by (le))",
+          "expr": "histogram_quantile(0.99, sum(rate(orders_value_USD_bucket[5m])) by (le))",
           "hide": false,
           "instant": false,
           "legendFormat": "p99",
@@ -584,6 +666,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 30,
             "gradientMode": "opacity",
@@ -646,6 +729,7 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "none"
         }
@@ -658,7 +742,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.5, sum(rate(order_processing_time_bucket[5m])) by (le))",
+          "expr": "histogram_quantile(0.5, sum(rate(orders_processing_time_milliseconds_bucket[5m])) by (le))",
           "instant": false,
           "legendFormat": "Median",
           "range": true,
@@ -670,7 +754,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum(rate(order_processing_time_bucket[5m])) by (le))",
+          "expr": "histogram_quantile(0.95, sum(rate(orders_processing_time_milliseconds_bucket[5m])) by (le))",
           "hide": false,
           "instant": false,
           "legendFormat": "p95",
@@ -683,7 +767,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.99, sum(rate(order_processing_time_bucket[5m])) by (le))",
+          "expr": "histogram_quantile(0.99, sum(rate(orders_processing_time_milliseconds_bucket[5m])) by (le))",
           "hide": false,
           "instant": false,
           "legendFormat": "p99",
@@ -711,6 +795,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 20,
             "gradientMode": "opacity",
@@ -773,6 +858,7 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "desc"
         }
@@ -785,9 +871,9 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum by(service_name, le) (rate(http_server_request_duration_seconds_bucket{http_route=\"/api/orders/\"}[1m])))",
+          "expr": "histogram_quantile(0.95, sum by(exported_job, le) (rate(http_server_request_duration_seconds_bucket{http_route=~\"/api/orders/|/health\", exported_job=\"1.0.0/eShop.Ordering\"}[5m])))",
           "instant": false,
-          "legendFormat": "{{service_name}} (p95)",
+          "legendFormat": "{{exported_job}} (p95)",
           "range": true,
           "refId": "A"
         }
@@ -812,6 +898,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 25,
             "gradientMode": "opacity",
@@ -842,8 +929,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -873,6 +959,7 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "desc"
         }
@@ -885,9 +972,9 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum by(path) (rate(http_server_request_duration_seconds_count{http_route=~\"/api/orders.*\"}[1m]))",
+          "expr": "(sum by(http_route) (rate(http_server_request_duration_seconds_count{http_route=~\"/api/orders.*\", http_response_status_code!=\"200\"}[1m])) * 100) / sum by(http_route) (rate(http_server_request_duration_seconds_count{http_route=~\"/api/orders.*\"}[1m]))",
           "instant": false,
-          "legendFormat": "{{path}}",
+          "legendFormat": "{{http_route}}",
           "range": true,
           "refId": "A"
         }
@@ -912,6 +999,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 25,
             "gradientMode": "opacity",
@@ -942,8 +1030,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -973,6 +1060,7 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "desc"
         }
@@ -1015,9 +1103,6 @@
       },
       "fieldConfig": {
         "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
           "custom": {
             "align": "auto",
             "cellOptions": {
@@ -1030,8 +1115,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1040,32 +1124,15 @@
             ]
           }
         },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "traceID"
-            },
-            "properties": [
-              {
-                "id": "links",
-                "value": {
-                  "targetBlank": true,
-                  "title": "View Trace",
-                  "url": "${__data.fields.traceID}"
-                }
-              }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "gridPos": {
-        "h": 8,
+        "h": 9,
         "w": 24,
         "x": 0,
         "y": 32
       },
-      "id": 31,
+      "id": 35,
       "options": {
         "cellHeight": "sm",
         "footer": {
@@ -1085,17 +1152,17 @@
             "type": "jaeger",
             "uid": "jaeger"
           },
-          "limit": 20,
           "operation": "PlaceOrder",
           "queryType": "search",
           "refId": "A",
-          "service": "eShop.Ordering.PlaceOrder"
+          "service": "eShop.Ordering"
         }
       ],
       "title": "Recent Order Traces",
       "type": "table"
     }
   ],
+  "preload": false,
   "refresh": "10s",
   "schemaVersion": 38,
   "style": "dark",
@@ -1113,4 +1180,5 @@
   "uid": "eshop-orders",
   "version": 1,
   "weekStart": ""
+}
 }
