@@ -1,0 +1,78 @@
+﻿sequenceDiagram
+participant Customer
+participant WebApp
+participant BasketAPI
+participant OrderAPI
+participant Database
+participant OpenTelemetry as OpenTelemetry SDK/Instrumentation
+participant OTelCollector as OpenTelemetry Collector
+participant Jaeger
+participant Prometheus
+participant Grafana
+
+%% Initial order creation process
+Customer->>WebApp: Place order request
+
+%% WebApp processing with telemetry
+activate WebApp
+Note over WebApp,OpenTelemetry: Auto-instrumentation starts span
+WebApp->>OpenTelemetry: Create root span (order_placement)
+OpenTelemetry-->>WebApp: Return span context
+
+%% Basket processing
+WebApp->>BasketAPI: Get basket items
+activate BasketAPI
+Note over BasketAPI,OpenTelemetry: Propagate trace context
+BasketAPI->>OpenTelemetry: Create child span (get_basket)
+OpenTelemetry-->>BasketAPI: Return span context
+BasketAPI->>Database: Query basket data
+Database-->>BasketAPI: Return basket items
+BasketAPI-->>WebApp: Return basket items
+BasketAPI->>OpenTelemetry: End span (get_basket)
+OpenTelemetry->>OTelCollector: Export basket span data
+deactivate BasketAPI
+
+%% Order API processing
+WebApp->>OrderAPI: Create order with items
+activate OrderAPI
+Note over OrderAPI,OpenTelemetry: Propagate trace context
+OrderAPI->>OpenTelemetry: Create child span (create_order)
+OpenTelemetry-->>OrderAPI: Return span context
+
+%% Data masking for security
+Note over OrderAPI: Mask sensitive data (card number, email)
+
+OrderAPI->>Database: Save order with masked data
+Database-->>OrderAPI: Return order ID
+
+%% Record metrics
+OrderAPI->>OpenTelemetry: Record metrics (order_completed, processing_time, order_value)
+OpenTelemetry->>OTelCollector: Export metrics data
+
+OrderAPI-->>WebApp: Return order confirmation
+OrderAPI->>OpenTelemetry: End span (create_order)
+OpenTelemetry->>OTelCollector: Export order span data
+deactivate OrderAPI
+
+WebApp-->>Customer: Display order confirmation
+WebApp->>OpenTelemetry: End root span (order_placement)
+OpenTelemetry->>OTelCollector: Export root span data
+deactivate WebApp
+
+%% Telemetry data flow
+OTelCollector->>Jaeger: Export all spans/traces
+OTelCollector->>Prometheus: Export all metrics
+
+%% Data exchange between monitoring systems
+Prometheus->>Jaeger: Share metric data for correlation
+Note over Prometheus,Jaeger: Integration allows metrics to be shown alongside traces
+
+%% Dashboard visualization
+Grafana->>Jaeger: Query trace data
+Jaeger-->>Grafana: Return trace data with correlated metrics
+Grafana->>Prometheus: Query metrics data
+Prometheus-->>Grafana: Return metrics data
+
+%% Admin/Developer visualization
+Note over Grafana: Display order processing dashboard
+Note over Jaeger: Display traces for all services (webapp, basket-api, catalog-api, etc.)

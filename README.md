@@ -1,142 +1,210 @@
-# eShop Reference Application - "AdventureWorks"
+# eShop OpenTelemetry & Security Integration
 
-A reference .NET application implementing an e-commerce website using a services-based architecture using [.NET Aspire](https://learn.microsoft.com/dotnet/aspire/).
+## Project Overview
 
-![eShop Reference Application architecture diagram](img/eshop_architecture.png)
+This project extends Microsoft's eShop reference microservices application with comprehensive OpenTelemetry instrumentation and security enhancements. The implementation focuses on the Order Creation flow, ensuring complete tracing from frontend to database while properly masking sensitive data such as payment information and personal identifiers.
 
-![eShop homepage screenshot](img/eshop_homepage.png)
+## Technology Stack
 
-## Getting Started
+- **ASP.NET Core**: Underlying framework for all microservices
+- **OpenTelemetry**: Core instrumentation library for collecting traces, metrics, and logs
+- **Jaeger**: Distributed tracing system for visualizing request flows across services
+- **Prometheus**: Time series database for metrics collection and storage
+- **Grafana**: Dashboard platform for creating unified visualizations
+- **k6**: Load testing tool for verification and performance testing
+- **Docker**: Containerization for services and observability stack
 
-This version of eShop is based on .NET 9. 
+## Architecture
 
-Previous eShop versions:
-* [.NET 8](https://github.com/dotnet/eShop/tree/release/8.0)
+The eShop application with observability components follows this architecture:
+
+![Architecture](docs/Architecture/architecture.png)
+
+For a detailed sequence diagram explaining the data flow, see the [telemetry flow documentation](docs/eshop-sequence-diagram.md).
+
+## How to Build and Run the eShop Environment with Observability
 
 ### Prerequisites
 
-- Clone the eShop repository: https://github.com/dotnet/eshop
-- [Install & start Docker Desktop](https://docs.docker.com/engine/install/)
+- Docker Desktop
+- .NET 9 SDK
+- Visual Studio 2022 or JetBrains Rider (recommended)
+- Git
 
-#### Windows with Visual Studio
-- Install [Visual Studio 2022 version 17.10 or newer](https://visualstudio.microsoft.com/vs/).
-  - Select the following workloads:
-    - `ASP.NET and web development` workload.
-    - `.NET Aspire SDK` component in `Individual components`.
-    - Optional: `.NET Multi-platform App UI development` to run client apps
+### Setup Steps
 
-Or
+1. Clone the repository with the observability changes:
 
-- Run the following commands in a Powershell & Terminal running as `Administrator` to automatically configure your environment with the required tools to build and run this application. (Note: A restart is required and included in the script below.)
-
-```powershell
-install-Module -Name Microsoft.WinGet.Configuration -AllowPrerelease -AcceptLicense -Force
-$env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
-get-WinGetConfiguration -file .\.configurations\vside.dsc.yaml | Invoke-WinGetConfiguration -AcceptConfigurationAgreements
+```bash
+git clone https://github.com/MrLoydHD/eShop
+cd eShop
 ```
 
-Or
+2. Start the application with observability components (In the base folder):
 
-- From Dev Home go to `Machine Configuration -> Clone repositories`. Enter the URL for this repository. In the confirmation screen look for the section `Configuration File Detected` and click `Run File`.
-
-#### Mac, Linux, & Windows without Visual Studio
-- Install the latest [.NET 9 SDK](https://dot.net/download?cid=eshop)
-
-Or
-
-- Run the following commands in a Powershell & Terminal running as `Administrator` to automatically configuration your environment with the required tools to build and run this application. (Note: A restart is required after running the script below.)
-
-##### Install Visual Studio Code and related extensions
-```powershell
-install-Module -Name Microsoft.WinGet.Configuration -AllowPrerelease -AcceptLicense  -Force
-$env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
-get-WinGetConfiguration -file .\.configurations\vscode.dsc.yaml | Invoke-WinGetConfiguration -AcceptConfigurationAgreements
-```
-
-> Note: These commands may require `sudo`
-
-- Optional: Install [Visual Studio Code with C# Dev Kit](https://code.visualstudio.com/docs/csharp/get-started)
-- Optional: Install [.NET MAUI Workload](https://learn.microsoft.com/dotnet/maui/get-started/installation?tabs=visual-studio-code)
-
-> Note: When running on Mac with Apple Silicon (M series processor), Rosetta 2 for grpc-tools. 
-
-### Running the solution
-
-> [!WARNING]
-> Remember to ensure that Docker is started
-
-* (Windows only) Run the application from Visual Studio:
- - Open the `eShop.Web.slnf` file in Visual Studio
- - Ensure that `eShop.AppHost.csproj` is your startup project
- - Hit Ctrl-F5 to launch Aspire
-
-* Or run the application from your terminal:
-```powershell
+```bash
+# Start all services including observability stack
 dotnet run --project src/eShop.AppHost/eShop.AppHost.csproj
 ```
-then look for lines like this in the console output in order to find the URL to open the Aspire dashboard:
-```sh
-Login to the dashboard at: http://localhost:19888/login?t=uniquelogincodeforyou
+
+Alternatively, using Visual Studio or Rider:
+- Open `eShop.sln`
+- Set `eShop.AppHost` as the startup project
+- Run the application
+
+3. Verify all services are running:
+
+```bash
+docker ps
 ```
 
-> You may need to install ASP.NET Core HTTPS development certificates first, and then close all browser tabs. Learn more at https://aka.ms/aspnet/https-trust-dev-cert
+You should see containers for all eShop services plus:
+- jaeger (port 16686)
+- prometheus (port 9090)
+- grafana (port 3000)
+- otel-collector
 
-### Azure Open AI
+## Steps to Configure and Launch the OpenTelemetry Collectors/Exporters
 
-When using Azure OpenAI, inside *eShop.AppHost/appsettings.json*, add the following section:
+The OpenTelemetry collector is automatically configured as part of the application startup. However, if you need to customize the configuration:
 
-```json
-  "ConnectionStrings": {
-    "OpenAi": "Endpoint=xxx;Key=xxx;"
-  }
+1. Navigate to the collector configuration:
+
+```bash
+cd observability/otel-collector
 ```
 
-Replace the values with your own. Then, in the eShop.AppHost *Program.cs*, set this value to **true**
+2. Edit the `config.yaml` file to adjust collectors, processors, or exporters:
 
-```csharp
-bool useOpenAI = false;
+```yaml
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+  
+  # PII filtering processor
+  attributes:
+    actions:
+      - key: http.request.header.authorization
+        action: update
+        value: "REDACTED"
+      - key: email
+        action: update
+        value: "REDACTED"
+
+exporters:
+  jaeger:
+    endpoint: jaeger:14250
+    tls:
+      insecure: true
+  prometheus:
+    endpoint: 0.0.0.0:8889
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [attributes, batch]
+      exporters: [jaeger]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [prometheus]
 ```
 
-Here's additional guidance on the [.NET Aspire OpenAI component](https://learn.microsoft.com/dotnet/aspire/azureai/azureai-openai-component?tabs=dotnet-cli). 
+3. Restart the observability stack for changes to take effect:
 
-### Use Azure Developer CLI
-
-You can use the [Azure Developer CLI](https://aka.ms/azd) to run this project on Azure with only a few commands. Follow the next instructions:
-
-- Install the latest or update to the latest [Azure Developer CLI (azd)](https://aka.ms/azure-dev/install).
-- Log in `azd` (if you haven't done it before) to your Azure account:
-```sh
-azd auth login
+```bash
+docker compose restart otel-collector
 ```
-- Initialize `azd` from the root of the repo.
-```sh
-azd init
+
+## Instructions to Set Up or View the Grafana Dashboard
+
+Grafana is automatically provisioned with dashboards. To access them:
+
+1. Open your browser and navigate to [http://localhost:3000](http://localhost:3000)
+
+2. Log in with the following credentials:
+    - Username: `admin`
+    - Password: `admin`
+
+3. Navigate to the dashboards by clicking on the "Dashboards" link in the left sidebar
+
+4. Available dashboards:
+    - **eShop Overview**: General system health and metrics
+    - **Order Processing**: Detailed metrics for the order flow
+    - **Service Performance**: Technical metrics for each service
+
+For adding custom dashboards:
+
+1. Place JSON dashboard definitions in `observability/grafana/dashboards/`
+2. Update provisioning settings in `observability/grafana/provisioning/`
+3. Restart the Grafana container:
+
+```bash
+docker compose restart grafana
 ```
-- During init:
-  - Select `Use code in the current directory`. Azd will automatically detect the .NET Aspire project.
-  - Confirm `.NET (Aspire)` and continue.
-  - Select which services to expose to the Internet (exposing `webapp` is enough to test the sample).
-  - Finalize the initialization by giving a name to your environment.
 
-- Create Azure resources and deploy the sample by running:
-```sh
-azd up
+## Load Testing the Application
+
+A comprehensive load testing suite is included to verify the observability implementation:
+
+1. Install k6:
+```bash
+# For macOS
+brew install k6
+
+# For Windows (with Chocolatey)
+choco install k6
+
+# For Linux
+sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+echo "deb https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+sudo apt-get update
+sudo apt-get install k6
 ```
-Notes:
-  - The operation takes a few minutes the first time it is ever run for an environment.
-  - At the end of the process, `azd` will display the `url` for the webapp. Follow that link to test the sample.
-  - You can run `azd up` after saving changes to the sample to re-deploy and update the sample.
-  - Report any issues to [azure-dev](https://github.com/Azure/azure-dev/issues) repo.
-  - [FAQ and troubleshoot](https://learn.microsoft.com/azure/developer/azure-developer-cli/troubleshoot?tabs=Browser) for azd.
 
-## Contributing
+2. Run the test suite:
+```bash
+# Navigate to the loadtest directory
+cd loadtest
 
-For more information on contributing to this repo, read [the contribution documentation](./CONTRIBUTING.md) and [the Code of Conduct](CODE-OF-CONDUCT.md).
+# Run the order creation test
+k6 run order_failure_test.js
+```
 
-### Sample data
+3. View results in Grafana dashboards to verify metrics collection
 
-The sample catalog data is defined in [catalog.json](https://github.com/dotnet/eShop/blob/main/src/Catalog.API/Setup/catalog.json). Those product names, descriptions, and brand names are fictional and were generated using [GPT-35-Turbo](https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/chatgpt), and the corresponding [product images](https://github.com/dotnet/eShop/tree/main/src/Catalog.API/Pics) were generated using [DALL·E 3](https://openai.com/dall-e-3).
+## Future Improvements
 
-## eShop on Azure
+1. **Extended Service Coverage**: Add OpenTelemetry instrumentation to additional microservices
+2. **Database Column Masking**: Implement SQL Server Dynamic Data Masking for production environments
+3. **Automated Alerting**: Configure alert rules based on metrics thresholds
+4. **Synthetic Monitoring**: Add continuous probing of critical API endpoints
+5. **Log Integration**: Connect logs with traces for complete context
 
-For a version of this app configured for deployment on Azure, please view [the eShop on Azure](https://github.com/Azure-Samples/eShopOnAzure) repo.
+## Related Documentation
+
+- [Detailed OpenTelemetry Implementation](docs/eshop-opentelemetry-doc.md): Comprehensive documentation of the implementation
+- [Telemetry Flow Sequence Diagram](docs/eshop-sequence-diagram.md): Detailed sequence diagram of the instrumented order flow
+
+## Conclusion
+
+This implementation successfully adds observability and security to the eShop application, with a focus on the Order Creation flow. The OpenTelemetry integration provides comprehensive visibility into system behavior while ensuring that sensitive data is properly protected.
+
+Key achievements:
+- End-to-end distributed tracing across microservices
+- Comprehensive metrics collection for business and technical insights
+- Proper masking of sensitive data in telemetry
+- Performance-optimized implementation with minimal overhead
+- Robust testing infrastructure to verify telemetry collection
+
+The system now provides both developers and business stakeholders with valuable insights into application behavior and performance, while maintaining appropriate security controls.
