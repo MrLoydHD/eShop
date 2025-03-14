@@ -1,14 +1,44 @@
 ﻿namespace eShop.PaymentProcessor.IntegrationEvents.EventHandling;
 
-public class OrderStatusChangedToStockConfirmedIntegrationEventHandler(
-    IEventBus eventBus,
-    IOptionsMonitor<PaymentOptions> options,
-    ILogger<OrderStatusChangedToStockConfirmedIntegrationEventHandler> logger) :
+using eShop.EventBus.Abstractions;
+using eShop.EventBus.Events;
+using eShop.PaymentProcessor.IntegrationEvents.Events;
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
+using System.Threading.Tasks;
+
+public class OrderStatusChangedToStockConfirmedIntegrationEventHandler : 
     IIntegrationEventHandler<OrderStatusChangedToStockConfirmedIntegrationEvent>
 {
+    private readonly IEventBus _eventBus;
+    private readonly IOptionsMonitor<PaymentOptions> _options;
+    private readonly ILogger<OrderStatusChangedToStockConfirmedIntegrationEventHandler> _logger;
+
+    public OrderStatusChangedToStockConfirmedIntegrationEventHandler(
+        IEventBus eventBus,
+        IOptionsMonitor<PaymentOptions> options,
+        ILogger<OrderStatusChangedToStockConfirmedIntegrationEventHandler> logger)
+    {
+        _eventBus = eventBus;
+        _options = options;
+        _logger = logger;
+    }
+
     public async Task Handle(OrderStatusChangedToStockConfirmedIntegrationEvent @event)
     {
-        logger.LogInformation("Handling integration event: {IntegrationEventId} - ({@IntegrationEvent})", @event.Id, @event);
+        // Create a sanitized version of the event for logging
+        var sanitizedEvent = new 
+        {
+            @event.OrderId,
+            BuyerName = "***masked***",
+            BuyerIdentityGuid = "***masked***",
+            @event.Id,
+            @event.CreationDate
+        };
+
+        // Log the sanitized version instead of the actual event
+        _logger.LogInformation("Handling integration event: {IntegrationEventId} - ({@IntegrationEvent})", 
+            @event.Id, sanitizedEvent);
 
         IntegrationEvent orderPaymentIntegrationEvent;
 
@@ -18,7 +48,7 @@ public class OrderStatusChangedToStockConfirmedIntegrationEventHandler(
         // Instead of a real payment we just take the env. var to simulate the payment 
         // The payment can be successful or it can fail
 
-        if (options.CurrentValue.PaymentSucceeded)
+        if (_options.CurrentValue.PaymentSucceeded)
         {
             orderPaymentIntegrationEvent = new OrderPaymentSucceededIntegrationEvent(@event.OrderId);
         }
@@ -27,8 +57,9 @@ public class OrderStatusChangedToStockConfirmedIntegrationEventHandler(
             orderPaymentIntegrationEvent = new OrderPaymentFailedIntegrationEvent(@event.OrderId);
         }
 
-        logger.LogInformation("Publishing integration event: {IntegrationEventId} - ({@IntegrationEvent})", orderPaymentIntegrationEvent.Id, orderPaymentIntegrationEvent);
+        _logger.LogInformation("Publishing integration event: {IntegrationEventId} - ({@IntegrationEvent})", 
+            orderPaymentIntegrationEvent.Id, orderPaymentIntegrationEvent);
 
-        await eventBus.PublishAsync(orderPaymentIntegrationEvent);
+        await _eventBus.PublishAsync(orderPaymentIntegrationEvent);
     }
 }

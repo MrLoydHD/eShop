@@ -1,0 +1,53 @@
+flowchart TD
+    subgraph "eShop Services"
+        webapp["WebApp"]
+        basket["Basket API"]
+        catalog["Catalog API"]
+        ordering["eShop.Ordering"]
+        identity["Identity API"]
+        orderproc["Order Processor"]
+        payproc["Payment Processor"]
+    end
+
+    subgraph "Observability Stack"
+        otel["OpenTelemetry SDK"]
+        collector["OpenTelemetry Collector"]
+        jaeger["Jaeger"]
+        prometheus["Prometheus"]
+        grafana["Grafana"]
+    end
+
+%% Service to OpenTelemetry connections
+    webapp -->|instrumented with| otel
+    basket -->|instrumented with| otel
+    catalog -->|instrumented with| otel
+    ordering -->|instrumented with| otel
+    identity -->|instrumented with| otel
+    orderproc -->|instrumented with| otel
+    payproc -->|instrumented with| otel
+
+%% OpenTelemetry data flow
+    otel -->|export traces & metrics| collector
+    collector -->|export traces| jaeger
+    collector -->|export metrics| prometheus
+
+%% Visualization connections
+    jaeger -->|trace data| grafana
+    prometheus -->|metric data| grafana
+
+%% Inter-service communications
+    webapp -->|calls| basket
+    webapp -->|calls| catalog
+    webapp -->|calls| ordering
+    webapp -->|calls| identity
+    ordering -->|sends clear basket message to| basket
+    basket -->|publishes events to| orderproc
+    ordering -->|processes events from| orderproc
+    orderproc -->|calls| payproc
+
+%% Style
+    classDef service fill:#c9e9f6,stroke:#6bb1cc,color:black
+    classDef observability fill:#f9d5ca,stroke:#e07b5d,color:black
+
+    class webapp,basket,catalog,ordering,identity,orderproc,payproc service
+    class otel,collector,jaeger,prometheus,grafana observability

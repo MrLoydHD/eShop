@@ -2490,7 +2490,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "db_client_connections_usage / db_client_connections_max",
+          "expr": "sum(db_client_connections_usage) / sum(db_client_connections_max)",
           "instant": false,
           "legendFormat": "{{exported_job}}",
           "range": true,

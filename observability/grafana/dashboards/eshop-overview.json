@@ -87,7 +87,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(orders_created_Number_of_orders_created_total)",
+          "expr": "sum(orders_created_Number_of_orders_attempted_to_be_created_total)",
           "instant": false,
           "legendFormat": "Total Orders",
           "range": true,
@@ -211,7 +211,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(orders_failed_total)",
+          "expr": "sum(orders_failed_Number_of_orders_that_failed_total)",
           "instant": false,
           "legendFormat": "Failed Orders",
           "range": true,

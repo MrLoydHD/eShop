@@ -972,7 +972,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "(sum by(http_route) (rate(http_server_request_duration_seconds_count{http_route=~\"/api/orders.*\", http_response_status_code!=\"200\"}[1m])) * 100) / sum by(http_route) (rate(http_server_request_duration_seconds_count{http_route=~\"/api/orders.*\"}[1m]))",
+          "expr": "(sum by(http_route) (rate(http_server_request_duration_seconds_count{http_route=~\"/api/orders.*\"}[1m])))",
           "instant": false,
           "legendFormat": "{{http_route}}",
           "range": true,
