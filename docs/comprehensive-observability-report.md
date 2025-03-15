@@ -1,19 +1,41 @@
-# eShop OpenTelemetry & Security Integration Documentation
+﻿# Comprehensive eShop Observability Implementation Report
+
+## Table of Contents
+1. [Project Overview](#project-overview)
+2. [Selected Feature: Order Creation Flow](#selected-feature-order-creation-flow)
+3. [Implementation Details](#implementation-details)
+    - [Infrastructure Setup](#infrastructure-setup)
+    - [Order Processing Instrumentation](#order-processing-instrumentation)
+    - [Data Scrubbing Implementation](#data-scrubbing-implementation)
+    - [Load Testing](#load-testing)
+4. [Telemetry Data Flow](#telemetry-data-flow)
+5. [Monitoring Dashboards](#monitoring-dashboards)
+    - [eShop Overview Dashboard](#1-eshop-overview-dashboard)
+    - [Order Business Metrics Dashboard](#2-order-business-metrics-dashboard)
+    - [Order API Performance Dashboard](#3-order-api-performance-dashboard)
+    - [Service Performance Dashboard](#4-service-performance-dashboard)
+    - [Database Performance Dashboard](#5-database-performance-dashboard)
+6. [Security and Data Masking](#security-and-data-masking)
+7. [Jaeger Monitoring Integration](#jaeger-monitoring-integration)
+8. [Cross-Service Trace Correlation](#cross-service-trace-correlation)
+9. [Results and Achievements](#results-and-achievements)
+10. [Future Improvements](#future-improvements)
+11. [Conclusion](#conclusion)
 
 ## Project Overview
 
-This documentation tracks the implementation of OpenTelemetry tracing and security features in the eShop microservices application. The project focuses on instrumenting the Order Creation flow end-to-end while ensuring sensitive data is properly masked in telemetry data and logs.
+This report documents the implementation of OpenTelemetry tracing and security features in the eShop microservices application. The project focuses on instrumenting the Order Creation flow end-to-end while ensuring sensitive data is properly masked in telemetry data and logs.
 
 ## Selected Feature: Order Creation Flow
 
 The "Place an Order" workflow was chosen as the target for OpenTelemetry instrumentation because:
-1. It spans multiple services (Web App, Basket API, Ordering API, etc...)
+1. It spans multiple services (Web App, Basket API, Ordering API, etc.)
 2. It contains sensitive data that needs protection (payment details, personal information)
 3. It represents a critical business process with high value for monitoring
 
 ## Implementation Details
 
-### 1. Infrastructure Setup
+### Infrastructure Setup
 
 #### OpenTelemetry Infrastructure Configuration
 
@@ -93,7 +115,7 @@ public static IResourceBuilder<T> WithObservability<T>(
 }
 ```
 
-### 2. Order Processing Instrumentation
+### Order Processing Instrumentation
 
 #### Core Telemetry Service
 
@@ -277,7 +299,7 @@ public async Task<bool> Handle(CreateOrderCommand command, CancellationToken can
 }
 ```
 
-### 3. Data Scrubbing Implementation
+### Data Scrubbing Implementation
 
 The telemetry service includes multiple methods for masking sensitive data:
 
@@ -305,7 +327,7 @@ private bool IsSensitiveProperty(string propertyName)
 }
 ```
 
-### 4. Load Testing (Available in [Load Tests Folder](../loadtest))
+### Load Testing
 
 Load tests were created to verify the tracing and metrics implementation:
 
@@ -371,54 +393,281 @@ export default function(data) {
 }
 ```
 
-### 5. Grafana Dashboard
+## Telemetry Data Flow
 
-A comprehensive Grafana dashboard was created to visualize the order processing flow with the following panels:
+The diagram below illustrates the complete flow of both the order creation business process and the associated telemetry data through the observability stack.
 
-1. **Business Metrics**:
-   - Total Orders
-   - Completed Orders
-   - Failed Orders
-   - Order Failure Rate
-   - Total Order Value
+![SequenceDiagram](SequenceDiagram/SequenceDiagram.png)
 
-2. **Performance Metrics**:
-   - Order Volume Trend
-   - Order Value Distribution
-   - Order Processing Time
-   - API Request Duration
-   - API Error Rate
+### Data Collection
+- The **OpenTelemetry SDK** is integrated into each service (WebApp, BasketAPI, OrderAPI, Identity-API, Catalog-API, Order-Processor, and Payment-Processor)
+- It automatically collects traces and metrics as the order flows through the system
+- Sensitive data (credit card numbers, emails) is masked before being included in telemetry
 
-3. **Distributed Tracing Integration**:
-   - Recent Order Traces table linked to Jaeger
+### Data Export
+- The OpenTelemetry SDK exports the collected telemetry data to the **OpenTelemetry Collector**
+- The collector acts as a central aggregation point for all telemetry data
 
-The dashboard is configured to automatically refresh every 10 seconds and provides both high-level KPIs and detailed performance insights.
+### Data Storage and Exchange
+- **Traces/Spans** are exported from the collector to **Jaeger**
+- **Metrics** are exported from the collector to **Prometheus**
+- Prometheus is connected to Jaeger, allowing correlation between metrics and traces
+- This integration enables Jaeger to show performance metrics alongside trace data
+
+### Visualization
+- **Grafana** queries both Jaeger and Prometheus
+- It combines the trace data and metrics into unified dashboards
+- This provides both transaction-level detail and system-level performance views
+- All services are monitored and visible in the Jaeger UI
+
+## Monitoring Dashboards
+
+Based on the implementation, the eShop monitoring solution includes several comprehensive Grafana dashboards that provide visibility into different aspects of the system.
+
+### 1. eShop Overview Dashboard
+
+![Overview eShop](img/eShopOverviewPart1.png)
+
+The eShop Overview dashboard provides a high-level view of the system's health and performance:
+
+- **Business Metrics Section**:
+    - Total Orders: 28,416 orders processed
+    - Completed Orders: 28,373 orders successfully completed
+    - Failed Orders: Error tracking for failed operations
+    - HTTP Request Rate by Service: Real-time monitoring of request rates across services
+
+- **Service Health Section**:
+    - HTTP 5xx Error Rate by Service: Monitoring for server errors
+    - Request duration tracking at p95 percentile
+    - Service error rates with visual indicators
+
+This dashboard serves as the entry point for monitoring, providing at-a-glance information about the overall system health.
+
+### 2. Order Business Metrics Dashboard
+
+<p float="left">
+  <img src="img/OrderDashboardPart1.png" />
+</p>
+
+A dedicated dashboard for order-related business metrics:
+
+- **KPI Panels**:
+    - Total Orders: 28,980
+    - Completed Orders: 28,975
+    - Failed Orders: 5
+    - Order Failure Rate: 0.0173%
+    - Total Order Value: $14.4M
+
+- **Trend Analysis**:
+    - Order Volume Trend: Visualization of order creation and completion rates in 5-minute intervals
+    - Order Value Distribution: Showing median, p95, and p99 value distributions
+    - Order Processing Time: Performance tracking for order processing operations
+
+This dashboard helps business stakeholders understand order volume, value, and processing efficiency.
+
+### 3. Order API Performance Dashboard
+
+<p float="left">
+  <img src="img/OrderDashboardPart2.png" />
+</p>
+
+Technical performance metrics for the ordering system:
+
+- **API Performance Metrics**:
+    - Order Processing Time: Tracking of processing duration with median, p95, and p99 values
+    - Order API Request Duration (p95): Performance tracking at the 95th percentile
+    - Request Rate by Endpoint: Traffic analysis for specific API endpoints
+    - Error Rate by Endpoint: Error monitoring showing zero errors
+
+This dashboard helps technical teams identify performance bottlenecks in the order processing flow.
+
+### 4. Service Performance Dashboard
+
+<p float="left">
+  <img src="img/ServicePerformancePart1.png" width="480" />
+  <img src="img/ServicePerformancePart2.png" width="480" />
+  <img src="img/ServicePerformancePart3.png" width="480" />
+  <img src="img/ServicePerformancePart4.png" width="480" height="230" />
+  <img src="img/ServicePerformancePart5.png" width="480" height="230" />
+  <img src="img/ServicePerformancePart6.png" width="480" />
+  <img src="img/ServicePerformancePart7.png" width="480" />
+  <img src="img/ServicePerformancePart9.png" width="480" />
+</p>
+
+Detailed technical metrics for service health:
+
+- **Service Health Status**:
+    - Overall health indicator ("Healthy")
+    - HTTP Request Duration by Service
+    - CPU and Memory Usage by Service
+
+- **Performance Metrics**:
+    - ThreadPool Threads by Service
+    - GC Collections Rate by Service
+    - Exception Rate tracking
+    - Network Metrics including DNS lookup duration
+    - Status Code Distribution (78% 200 OK responses)
+
+This dashboard helps operations teams monitor the technical health of the services.
+
+### 5. Database Performance Dashboard
+
+<p float="left">
+  <img src="img/ServicePerformancePart10.png" width="480" />
+  <img src="img/ServicePerformancePart11.png" width="480" />
+  <img src="img/ServicePerformancePart12.png" />
+</p>
+
+Metrics related to database interactions:
+
+- **Database Command Performance**:
+    - Command Duration (p95): Tracking query performance
+    - Read/Write Bytes Rate: Monitoring database I/O
+    - Currently Executing DB Commands
+    - Connection Usage monitoring (1.40%)
+    - Connection Usage by State
+
+This dashboard helps database administrators and developers optimize database interactions.
+
+## Security and Data Masking
+
+The implementation demonstrates effective PII masking in action across the system:
+
+### Payment Processing Trace
+
+![ProcessPayment](img/ProcessPaymentMasked.png)
+
+In the `ProcessPayment` span, sensitive payment data is successfully masked:
+
+- `card.type.id`: `***masked***`
+- `payment.card.expiration.month`: `***masked***`
+- `payment.card.expiration.year`: `***masked***`
+- `payment.card.masked`: `***masked***`
+
+The `log.contains_sensitive_data` tag is properly set to `masked` to indicate that sensitive data has been detected and protected.
+
+### Order Processing Trace
+
+![PlaceOrder](img/PlaceOrderMasked.png)
+
+In the `PlaceOrder` span, user identity information is masked:
+
+- `user.id.masked`: `d018a23a-****-****-****-aaad0e4a781`
+- `log.contains_sensitive_data`: `masked`
+
+This demonstrates the system's ability to identify and mask user identifiers, which could be used for identity theft if exposed.
+
+### API Requests
+
+![ServerAddressMasked](img/ServerAddressMasked.png)
+
+In the Catalog API request trace, server details are protected:
+
+- `server.address`: `***masked***`
+
+This prevents exposing internal infrastructure details that could be useful to attackers.
+
+## Jaeger Monitoring Integration
+
+The implementation successfully integrates Jaeger for distributed tracing:
+
+### Service Discovery
+
+![Jaeger Monitoring WebAPP](img/Jaeger_Monitoring_WebAPP.png)
+
+Jaeger properly discovers and monitors all eShop services:
+
+- webapp
+- basket-api
+- catalog-api
+- eShop.Ordering (formerly ordering-api)
+- identity-api
+- order-processor
+- payment-processor
+- jaeger (self-monitoring)
+
+### Trace Details
+
+Jaeger captures detailed traces showing the full order flow:
+
+- `PlaceOrder` span from eShop.Ordering service
+- `ProcessPayment` span showing payment processing
+- `GET /api/catalog/items/by` span from catalog-api service
+
+### Service Filtering
+
+The Jaeger UI effectively allows filtering by service, as shown in the service selection dropdowns.
+
+### Latency Visualization
+
+Jaeger provides detailed timing information for each span (Example: PlaceOrder - 444.9ms, ProcessPayment - 442.51ms), enabling performance analysis.
+
+### Tag-Based Filtering
+
+The Jaeger UI shows tags that can be used for filtering:
+- `log.contains_sensitive_data`: `masked`
+- `order.id`
+- `order.items.count`
+- `span.kind`
+
+## Cross-Service Trace Correlation
+
+The implementation successfully correlates traces across services:
+
+1. **Webapp to API Services**: Tracing shows operations from webapp connecting to catalog-api
+
+2. **API to Processing Flow**: The traces show the complete order processing flow from API calls through to the payment processor
+
+3. **Event-Based Communication**: The system captures traces for event-based communication, like the `OrderStatusChangedToStockConfirmedIntegrationEvent receive`
 
 ## Results and Achievements
 
 1. **End-to-End Tracing**: Successfully implemented tracing for the complete order processing flow from frontend to database
+
 2. **Sensitive Data Protection**: Implemented comprehensive masking for:
-   - Credit card numbers
-   - Email addresses
-   - Personal information
-   - Sensitive JSON properties
+    - Credit card numbers
+    - Email addresses
+    - Personal information
+    - Sensitive JSON properties
 
 3. **Performance Monitoring**: Created metrics to track:
-   - Order processing time
-   - Order failure rates
-   - Order volumes and values
+    - Order processing time
+    - Order failure rates
+    - Order volumes and values
 
 4. **Error Monitoring**: Built specialized error detection and load testing to verify the error tracking pipeline
 
-5. **Visualization**: Created a comprehensive Grafana dashboard that provides both business and technical insights into the ordering process
+5. **Visualization**: Created comprehensive Grafana dashboards that provide both business and technical insights into the ordering process
+
+6. **Metrics Integration**: Successfully correlated metrics with traces:
+    - HTTP Request Metrics: Tracking of request rates, durations, and error rates by service
+    - Business Metrics: Order counts, values, and failure rates
+    - Resource Metrics: CPU, memory, thread pool, and GC metrics
+    - Database Metrics: Query performance, connection usage
 
 ## Future Improvements
 
-1. **Additional Services**: Extend the instrumentation to cover more services in the eShop application
-2. **Database Column Masking**: Implement SQL Server Dynamic Data Masking for the sensitive columns
-3. **Alerting**: Configure alerts for specific error conditions or performance degradation
-4. **Advanced Debugging**: Add more detailed context to traces to facilitate faster root cause analysis
+1. **Extended Service Coverage**: Add OpenTelemetry instrumentation to additional microservices
+
+2. **Database Column Masking**: Implement SQL Server Dynamic Data Masking for production environments
+
+3. **Automated Alerting**: Configure alert rules based on metrics thresholds
+
+4. **Synthetic Monitoring**: Add continuous probing of critical API endpoints
+
+5. **Log Integration**: Connect logs with traces for complete context
+
+6. **Advanced Debugging**: Add more detailed context to traces to facilitate faster root cause analysis
 
 ## Conclusion
 
-The project successfully integrated OpenTelemetry to provide comprehensive visibility into the Order Creation flow while protecting sensitive customer data. The implementation follows security best practices for telemetry and logging, ensuring that no PII or payment data is exposed in traces or logs.
+The implemented monitoring solution provides comprehensive visibility into the eShop application while maintaining proper security controls. The project successfully integrated OpenTelemetry to provide comprehensive visibility into the Order Creation flow while protecting sensitive customer data. The implementation follows security best practices for telemetry and logging, ensuring that no PII or payment data is exposed in traces or logs.
+
+Key achievements:
+- End-to-end distributed tracing across microservices
+- Comprehensive metrics collection for business and technical insights
+- Proper masking of sensitive data in telemetry
+- Performance-optimized implementation with minimal overhead
+- Robust testing infrastructure to verify telemetry collection
+
+The system now provides both developers and business stakeholders with valuable insights into application behavior and performance, while maintaining appropriate security controls.

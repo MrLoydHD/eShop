@@ -20,7 +20,7 @@ The eShop application with observability components follows this architecture:
 
 ![Architecture](docs/Architecture/architecture.png)
 
-For a detailed sequence diagram explaining the data flow, see the [telemetry flow documentation](docs/eshop-sequence-diagram.md).
+For a detailed explanation of the data flow, see the [Comprehensive Observability Implementation Report](docs/comprehensive-observability-report.md).
 
 ## How to Build and Run the eShop Environment with Observability
 
@@ -161,7 +161,7 @@ The implementation includes comprehensive data masking for sensitive information
 - **Payment Information**: Credit card details, expiration dates, and security codes are properly masked
 - **Infrastructure Details**: Internal server addresses and connection details are protected
 
-For examples and details of the data masking implementation, refer to the [monitoring details documentation](docs/eshop-monitoring-details.md).
+For examples and details of the data masking implementation, refer to the [Comprehensive Observability Implementation Report](docs/comprehensive-observability-report.md).
 
 ## Jaeger Monitoring
 
@@ -173,7 +173,7 @@ Jaeger is configured to monitor all eShop services and provides detailed distrib
 - **Performance Analysis**: Detailed timing information for each operation
 - **Security Integration**: Works with the data masking implementation to protect sensitive data
 
-For more information on the Jaeger implementation, see the [monitoring details documentation](docs/eshop-monitoring-details.md).
+For more information on the Jaeger implementation, see the [Comprehensive Observability Implementation Report](docs/comprehensive-observability-report.md).
 
 ## Load Testing the Application
 
@@ -215,9 +215,7 @@ k6 run order_failure_test.js
 
 ## Related Documentation
 
-- [Detailed OpenTelemetry Implementation](docs/eshop-opentelemetry-doc.md): Comprehensive documentation of the implementation
-- [Telemetry Flow Sequence Diagram](docs/eshop-sequence-diagram.md): Detailed sequence diagram of the instrumented order flow
-- [Monitoring Details](docs/eshop-monitoring-details.md): In-depth information about Grafana dashboards, data masking, and Jaeger monitoring
+- [Comprehensive Observability Implementation Report](docs/comprehensive-observability-report.md): Complete documentation of OpenTelemetry implementation, telemetry data flow, monitoring dashboards, security measures, and Jaeger integration
 
 ## Conclusion
 
