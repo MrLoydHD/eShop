@@ -1,5 +1,9 @@
 ﻿# Comprehensive eShop Observability Implementation Report
 
+## Github Link
+
+[https://github.com/MrLoydHD/eShop](https://github.com/MrLoydHD/eShop)
+
 ## Table of Contents
 1. [Project Overview](#project-overview)
 2. [Selected Feature: Order Creation Flow](#selected-feature-order-creation-flow)
@@ -671,3 +675,4 @@ Key achievements:
 - Robust testing infrastructure to verify telemetry collection
 
 The system now provides both developers and business stakeholders with valuable insights into application behavior and performance, while maintaining appropriate security controls.
+
